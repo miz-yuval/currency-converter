@@ -1,0 +1,267 @@
+/*
+ * styles.css — Currency Converter Tooltip Styles
+ *
+ * Injected into every page alongside content.js.
+ *
+ * KEY DESIGN DECISIONS
+ * ─────────────────────
+ * • `all: initial` on .cc-tooltip and all children creates a hard style
+ *   isolation boundary so host-page CSS cannot bleed into the tooltip.
+ *
+ *   IMPORTANT: `font-family` is declared directly in the `all: initial`
+ *   reset block (not just on .cc-tooltip). Because `all: initial` breaks
+ *   CSS inheritance on every intermediate element, a child using
+ *   `font-family: inherit` would otherwise receive the browser's default
+ *   (usually Times New Roman) rather than the system font. Declaring it
+ *   upfront on every element avoids the broken inheritance chain entirely.
+ *
+ * • z-index: 2147483647 is the maximum safe 32-bit integer — floats above
+ *   page modals and overlays.
+ *
+ * • backdrop-filter: blur() provides the frosted-glass look on Chrome 88+.
+ *
+ * • Fade-in driven by `.cc-tooltip--visible` added after a double
+ *   requestAnimationFrame so the browser commits opacity:0 before the
+ *   transition starts.
+ */
+
+/* ── Hard reset / style isolation ────────────────────────────────────────── */
+.cc-tooltip,
+.cc-tooltip * {
+  all: initial;
+  box-sizing:  border-box !important;
+  /* Declare the font on EVERY element so inheritance breakage doesn't matter */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif !important;
+}
+
+/* ── Base tooltip container ──────────────────────────────────────────────── */
+.cc-tooltip {
+  /* Layout — fixed top-right, expands leftward as content grows */
+  display:  block !important;
+  position: fixed !important;
+  top:      50px  !important;
+  right:    50px  !important;
+  left:     auto  !important;
+  bottom:   auto  !important;
+  z-index:  2147483647 !important;
+
+  width:     auto !important;
+  min-width: 130px !important;
+  max-width: calc(100vw - 120px) !important;
+
+  padding:       8px 11px !important;
+  border-radius: 10px !important;
+
+  /* Dark frosted-glass */
+  background:              rgba(14, 14, 28, 0.72) !important;
+  backdrop-filter:         blur(22px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
+
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    0 2px 8px  rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07) !important;
+
+  font-size:   14px   !important;
+  line-height: 1.4    !important;
+  color:       #f0f0f8 !important;
+
+  -webkit-font-smoothing:  antialiased !important;
+  -moz-osx-font-smoothing: grayscale   !important;
+
+  pointer-events: auto    !important;
+  user-select:    none    !important;
+  cursor:         default !important;
+
+  /* ── Fade-in / fade-out animation ── */
+  opacity:   0 !important;
+  transform: translateY(-8px) scale(0.96) !important;
+  transition:
+    opacity   220ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Visible state — added by JS after double-rAF */
+.cc-tooltip.cc-tooltip--visible {
+  opacity:   1 !important;
+  transform: translateY(0) scale(1) !important;
+}
+
+/* Error variant */
+.cc-tooltip.cc-tooltip--error {
+  background:   rgba(160, 30, 30, 0.82)    !important;
+  border-color: rgba(255, 120, 120, 0.30)  !important;
+  width:        auto   !important;
+  max-width:    280px  !important;
+  font-size:    13px   !important;
+  color:        #ffd0d0 !important;
+  padding:      10px 14px !important;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.cc-tooltip__header {
+  display:        flex   !important;
+  align-items:    center !important;
+  gap:            7px    !important;
+  margin-bottom:  8px    !important;
+  padding-bottom: 8px    !important;
+  border-bottom:  1px solid rgba(255, 255, 255, 0.10) !important;
+}
+
+/* Original selected text */
+.cc-tooltip__original {
+  display:       block    !important;
+  flex:          1 1 auto !important;
+  max-width:     160px    !important;
+  font-size:     14px     !important;
+  font-weight:   700      !important;
+  color:         #ffffff  !important;
+  white-space:   nowrap   !important;
+  overflow:      hidden   !important;
+  text-overflow: ellipsis !important;
+  text-align:    center   !important;
+}
+
+/* Badge wrapper — provides a positioned parent for the picker dropdown */
+.cc-tooltip__badge-wrapper {
+  position: relative  !important;
+  flex:      0 0 auto !important;
+  display:   block    !important;
+}
+
+/* Source currency badge (e.g. "USD") */
+.cc-tooltip__source-badge {
+  display:        inline-block                    !important;
+  font-size:      9px                             !important;
+  font-weight:    800                             !important;
+  letter-spacing: 0.09em                          !important;
+  text-transform: uppercase                       !important;
+  color:          #90c2ff                         !important;
+  background:     rgba(80, 140, 255, 0.20)        !important;
+  border:         1px solid rgba(80, 140, 255, 0.35) !important;
+  border-radius:  5px                             !important;
+  padding:        2px 6px                         !important;
+  white-space:    nowrap                          !important;
+  cursor:         pointer                         !important;
+  transition:     background 120ms ease           !important;
+}
+.cc-tooltip__source-badge:hover {
+  background: rgba(80, 140, 255, 0.35) !important;
+}
+
+/* ── Currency picker dropdown ─────────────────────────────────────────────── */
+.cc-tooltip__currency-picker {
+  position:   absolute       !important;
+  top:        calc(100% + 4px) !important;
+  right:      0              !important;
+  z-index:    1              !important;
+  background: rgba(18, 18, 34, 0.97) !important;
+  border:     1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 7px         !important;
+  overflow:   hidden         !important;
+  overflow-y: auto           !important;
+  max-height: 180px          !important;
+  min-width:  54px           !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.50) !important;
+}
+
+.cc-tooltip__picker-item {
+  display:        block      !important;
+  padding:        5px 10px   !important;
+  font-size:      11px       !important;
+  font-weight:    700        !important;
+  letter-spacing: 0.06em     !important;
+  color:          rgba(255, 255, 255, 0.75) !important;
+  cursor:         pointer    !important;
+  white-space:    nowrap     !important;
+  transition:     background 80ms !important;
+}
+.cc-tooltip__picker-item:hover {
+  background: rgba(80, 140, 255, 0.28) !important;
+  color:      #ffffff                  !important;
+}
+/* Currently-active source highlighted */
+.cc-tooltip__picker-item--active {
+  color:      #90c2ff                  !important;
+  background: rgba(80, 140, 255, 0.14) !important;
+}
+
+/* Close (×) button */
+.cc-tooltip__close {
+  display:         inline-flex                    !important;
+  align-items:     center                         !important;
+  justify-content: center                         !important;
+  flex:            0 0 auto                       !important;
+  background:      none                           !important;
+  border:          none                           !important;
+  border-radius:   6px                            !important;
+  color:           rgba(255, 255, 255, 0.45)      !important;
+  font-size:       18px                           !important;
+  line-height:     1                              !important;
+  width:           22px                           !important;
+  height:          22px                           !important;
+  cursor:          pointer                        !important;
+  padding:         0                              !important;
+  transition:
+    color      150ms ease,
+    background 150ms ease !important;
+}
+
+.cc-tooltip__close:hover {
+  color:      rgba(255, 255, 255, 0.90) !important;
+  background: rgba(255, 255, 255, 0.10) !important;
+}
+
+/* ── Conversion list ─────────────────────────────────────────────────────── */
+.cc-tooltip__list {
+  display:        flex   !important;
+  flex-direction: column !important;
+  gap:            4px    !important;
+  list-style:     none   !important;
+  margin:         0      !important;
+  padding:        0      !important;
+}
+
+.cc-tooltip__row {
+  display:         flex          !important;
+  justify-content: space-between !important;
+  align-items:     baseline      !important;
+  padding:         3px 0         !important;
+  white-space:     nowrap        !important;
+  gap:             12px          !important;
+}
+
+/* Currency code label (left side) */
+.cc-tooltip__currency-code {
+  display:        inline-block               !important;
+  min-width:      36px                       !important;
+  font-size:      10px                       !important;
+  font-weight:    400                        !important;
+  letter-spacing: 0.08em                     !important;
+  text-transform: uppercase                  !important;
+  color:          rgba(255, 255, 255, 0.45)  !important;
+}
+
+/* Converted amount (right side) */
+.cc-tooltip__amount {
+  display:              inline-block !important;
+  font-size:            14px         !important;
+  font-weight:          400          !important;
+  color:                #f0f0f8      !important;
+  font-variant-numeric: tabular-nums !important;
+  text-align:           right        !important;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.cc-tooltip__footer {
+  display:     block                             !important;
+  margin-top:  10px                              !important;
+  padding-top: 8px                               !important;
+  border-top:  1px solid rgba(255, 255, 255, 0.08) !important;
+  font-size:   10px                              !important;
+  color:       rgba(255, 255, 255, 0.30)         !important;
+  text-align:  right                             !important;
+}

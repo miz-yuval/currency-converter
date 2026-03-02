@@ -1,0 +1,24 @@
+# ── OS files ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor / IDE ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Node (if you ever add a build step) ───────────────────────────────────────
+node_modules/
+npm-debug.log*
+package-lock.json
+
+# ── Build / packaging output ──────────────────────────────────────────────────
+dist/
+build/
+*.zip
+
+# ── Chrome extension local dev artifacts ──────────────────────────────────────
+# Unpacked extension cache written by Chrome
+_metadata/

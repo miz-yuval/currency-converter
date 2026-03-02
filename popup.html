@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Currency Converter</title>
+  <style>
+    /* ── Base ──────────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 340px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      color: #1a1a2e;
+      background: #f5f6fc;
+      padding: 14px 14px 12px;
+    }
+
+    /* ── Header ───────────────────────────────────────────────────────────── */
+    .header {
+      display: flex; align-items: center; gap: 9px;
+      margin-bottom: 14px; padding-bottom: 12px;
+      border-bottom: 1px solid #e2e4f0;
+    }
+    .header__icon    { width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0; }
+    .header__title   { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+    .header__subtitle{ font-size: 11px; color: #7a7a9d; margin-top: 1px; }
+
+    /* ── Section ──────────────────────────────────────────────────────────── */
+    .section { margin-bottom: 12px; }
+    .section-header {
+      display: flex; align-items: baseline;
+      justify-content: space-between; margin-bottom: 6px;
+    }
+    .section-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.07em; color: #9a9abf;
+    }
+    .section-hint { font-size: 10px; color: #c4c4d8; font-style: italic; }
+
+    /* ── Toggle ───────────────────────────────────────────────────────────── */
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #fff; border: 1.5px solid #e2e4f0;
+      border-radius: 9px; padding: 9px 11px;
+    }
+    .toggle-row__text { display: flex; flex-direction: column; gap: 1px; }
+    .toggle-row__title{ font-size: 13px; font-weight: 600; }
+    .toggle-row__desc { font-size: 11px; color: #aaaacc; }
+
+    .toggle { position: relative; width: 42px; height: 24px; flex-shrink: 0; margin-left: 10px; }
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle__track {
+      position: absolute; inset: 0; background: #d0d4e8;
+      border-radius: 24px; cursor: pointer; transition: background 200ms;
+    }
+    .toggle__thumb {
+      position: absolute; width: 18px; height: 18px;
+      left: 3px; top: 3px; background: #fff; border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.22);
+      transition: transform 200ms; pointer-events: none;
+    }
+    .toggle input:checked ~ .toggle__track { background: #4f7cf7; }
+    .toggle input:checked ~ .toggle__track .toggle__thumb { transform: translateX(18px); }
+
+    /* ── Currency list ────────────────────────────────────────────────────── */
+    .currency-list {
+      background: #fff;
+      border: 1.5px solid #e2e4f0;
+      border-radius: 9px;
+      overflow: hidden;
+      margin-bottom: 7px;
+      /* Scrollable if many currencies are added */
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .currency-list:empty::after {
+      content: "No currencies yet — add one below";
+      display: block; text-align: center; padding: 16px 10px;
+      color: #bbb; font-size: 12px;
+    }
+
+    /* ── Currency row ─────────────────────────────────────────────────────── */
+    .currency-item {
+      display: flex; align-items: center;
+      gap: 7px; padding: 6px 9px;
+      border-bottom: 1px solid #f0f1f8;
+      position: relative;
+      transition: background 120ms;
+    }
+    .currency-item:last-child { border-bottom: none; }
+
+    /*
+     * Outlined = this currency is the default source.
+     * box-shadow inset creates a visible border without shifting layout.
+     * The badge switches to a solid fill for extra clarity.
+     */
+    .currency-item.is-default {
+      background: rgba(79, 124, 247, 0.06);
+      box-shadow: inset 0 0 0 2px rgba(79, 124, 247, 0.70);
+      z-index: 1;
+    }
+
+    /* Clickable area: badge + name */
+    .currency-item__info {
+      display: flex; align-items: center;
+      gap: 7px; flex: 1; min-width: 0;
+      cursor: pointer; padding: 2px 0;
+    }
+    .currency-item__info:hover .currency-item__code {
+      border-color: rgba(79, 124, 247, 0.50);
+      background: rgba(79, 124, 247, 0.18);
+    }
+
+    .currency-item__code {
+      display: inline-block; flex-shrink: 0;
+      min-width: 36px; text-align: center;
+      font-size: 10px; font-weight: 800; letter-spacing: 0.05em;
+      color: #4f7cf7;
+      background: rgba(79, 124, 247, 0.10);
+      border: 1px solid rgba(79, 124, 247, 0.22);
+      border-radius: 4px; padding: 2px 4px;
+      transition: background 140ms, color 140ms, border-color 140ms;
+    }
+    /* Solid badge when this row is the default */
+    .currency-item.is-default .currency-item__code {
+      background: #4f7cf7;
+      color: #fff;
+      border-color: #4f7cf7;
+    }
+
+    .currency-item__name {
+      font-size: 12px; color: #4a4a6e;
+      flex: 1; min-width: 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* ── Inline conversion input ─────────────────────────────────────────── */
+    .currency-input {
+      width: 100px; flex-shrink: 0;
+      padding: 4px 7px;
+      border: 1.5px solid #e2e4f0;
+      border-radius: 6px;
+      font-size: 12px; font-family: inherit; font-weight: 500;
+      text-align: right;
+      color: #1a1a2e;
+      background: #f8f9ff;
+      outline: none;
+      font-variant-numeric: tabular-nums;
+      transition: border-color 150ms, background 150ms;
+    }
+    .currency-input:focus {
+      border-color: #4f7cf7;
+      background: #fff;
+    }
+    /* Slightly highlighted input when this row is the active default */
+    .currency-item.is-default .currency-input {
+      border-color: rgba(79, 124, 247, 0.35);
+      background: #fff;
+    }
+    /* Hide browser spin arrows on number inputs */
+    .currency-input::-webkit-inner-spin-button,
+    .currency-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+    .currency-input[type=number] { -moz-appearance: textfield; }
+
+    /* ── Remove button ────────────────────────────────────────────────────── */
+    .currency-item__remove {
+      background: none; border: none;
+      color: #ccc; font-size: 14px; line-height: 1;
+      cursor: pointer; padding: 3px 4px; border-radius: 4px;
+      flex-shrink: 0;
+      transition: color 120ms, background 120ms;
+    }
+    .currency-item__remove:hover { color: #e05252; background: rgba(224,82,82,0.10); }
+
+    /* ── Fallback note ────────────────────────────────────────────────────── */
+    .fallback-note {
+      font-size: 10px; color: #b8b8d0; font-style: italic;
+      margin: 5px 2px 7px; line-height: 1.4;
+    }
+
+    /* ── Add-currency button ──────────────────────────────────────────────── */
+    .add-btn {
+      width: 100%; padding: 7px 10px;
+      background: transparent;
+      border: 1.5px dashed #c8cae0;
+      border-radius: 9px;
+      color: #7a7a9d;
+      font-size: 13px; font-family: inherit;
+      cursor: pointer; text-align: center;
+      transition: border-color 150ms, color 150ms, background 150ms;
+    }
+    .add-btn:hover {
+      border-color: #4f7cf7; color: #4f7cf7;
+      background: rgba(79, 124, 247, 0.05);
+    }
+
+    /* ── Add-currency search dropdown ────────────────────────────────────── */
+    .add-dropdown {
+      margin-top: 5px; background: #fff;
+      border: 1.5px solid #d0d4ee;
+      border-radius: 9px; overflow: hidden;
+      box-shadow: 0 5px 16px rgba(0, 0, 30, 0.12);
+    }
+    .add-search {
+      width: 100%; padding: 8px 11px;
+      border: none; border-bottom: 1px solid #eef0f8;
+      font-size: 13px; font-family: inherit;
+      color: #1a1a2e; outline: none; background: #fff;
+    }
+    .add-search::placeholder { color: #bbb; }
+
+    .add-results { list-style: none; max-height: 150px; overflow-y: auto; }
+    .add-result-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 11px; cursor: pointer;
+      border-bottom: 1px solid #f4f5fc;
+      transition: background 80ms;
+    }
+    .add-result-item:last-child { border-bottom: none; }
+    .add-result-item:hover { background: #f0f4ff; }
+    .add-result-item__code {
+      font-size: 10px; font-weight: 800; letter-spacing: 0.06em;
+      color: #4f7cf7; min-width: 30px;
+    }
+    .add-result-item__name { font-size: 12px; color: #555; }
+    .add-no-results {
+      padding: 11px; text-align: center;
+      color: #bbb; font-size: 12px;
+    }
+
+    /* ── Rates status line ────────────────────────────────────────────────── */
+    .rates-status {
+      font-size: 10px; color: #c0c0d8;
+      text-align: right; margin-top: 4px; min-height: 14px;
+    }
+
+    /* ── Footer ───────────────────────────────────────────────────────────── */
+    .footer {
+      margin-top: 12px; padding-top: 12px;
+      border-top: 1px solid #e2e4f0;
+    }
+    .save-btn {
+      display: block; width: 100%; padding: 10px;
+      background: #4f7cf7; color: #fff;
+      border: none; border-radius: 9px;
+      font-size: 14px; font-weight: 700; font-family: inherit;
+      cursor: pointer;
+      transition: background 150ms, transform 100ms;
+    }
+    .save-btn:hover  { background: #3d6cec; }
+    .save-btn:active { background: #2d5cdc; transform: scale(0.98); }
+    .save-btn:disabled { background: #b0b8e8; cursor: not-allowed; }
+
+    .status {
+      text-align: center; font-size: 12px; font-weight: 500;
+      margin-top: 8px; min-height: 16px;
+      opacity: 1; transition: opacity 400ms;
+    }
+    .status--hidden  { opacity: 0; }
+    .status--success { color: #3dbc6d; }
+    .status--error   { color: #e05252; }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ─────────────────────────────────────────────────────────── -->
+  <div class="header">
+    <img class="header__icon" src="icons/icon48.png" alt="" width="26" height="26">
+    <div>
+      <div class="header__title">Currency Converter</div>
+      <div class="header__subtitle">Highlight any number to convert</div>
+    </div>
+  </div>
+
+  <!-- ── Auto-detect toggle ─────────────────────────────────────────────── -->
+  <div class="section">
+    <span class="section-label">Detection mode</span>
+    <div class="toggle-row">
+      <div class="toggle-row__text">
+        <span class="toggle-row__title">Auto-detect currency</span>
+        <span class="toggle-row__desc">Reads symbols from the page context</span>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="autoDetect" checked>
+        <span class="toggle__track">
+          <span class="toggle__thumb"></span>
+        </span>
+      </label>
+    </div>
+  </div>
+
+  <!-- ── Currency list with inline converter ────────────────────────────── -->
+  <!--
+    Each row shows: [CODE] Name   [  amount input  ] [×]
+    The outlined (default) row is the source currency for conversion.
+    Typing in ANY row converts to all others and sets that row as the default.
+    Clicking the badge/name of a row also sets it as the default.
+  -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-label">My currencies</span>
+      <span class="section-hint">click a row to set as fallback</span>
+    </div>
+
+    <div id="currencyList" class="currency-list"></div>
+
+    <!-- Fallback note -->
+    <p class="fallback-note">* Outlined currency is used as the source when no symbol can be detected on the page.</p>
+
+    <!-- Add button -->
+    <button class="add-btn" id="addBtn">＋ Add currency</button>
+
+    <!-- Search dropdown (shown on add-button click) -->
+    <div class="add-dropdown" id="addDropdown" hidden>
+      <input class="add-search" id="addSearch" type="text"
+             placeholder="Search by name or code…" autocomplete="off">
+      <ul class="add-results" id="addResults"></ul>
+    </div>
+
+    <!-- Exchange rates freshness indicator -->
+    <div class="rates-status" id="ratesStatus"></div>
+  </div>
+
+  <!-- ── Footer: Save ───────────────────────────────────────────────────── -->
+  <div class="footer">
+    <button class="save-btn" id="saveBtn">Save</button>
+    <p class="status status--hidden" id="status" aria-live="polite"></p>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

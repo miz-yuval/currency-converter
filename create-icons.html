@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Currency Converter — Icon Generator</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 520px;
+      margin: 60px auto;
+      padding: 0 24px;
+      color: #1a1a2e;
+      background: #f5f6fc;
+    }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    p  { color: #555; line-height: 1.6; margin-bottom: 16px; }
+    .previews {
+      display: flex;
+      align-items: flex-end;
+      gap: 20px;
+      margin: 24px 0;
+      padding: 24px;
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e2e4f0;
+    }
+    .preview { text-align: center; }
+    .preview canvas { display: block; margin: 0 auto 6px; border-radius: 4px; }
+    .preview span { font-size: 11px; color: #888; }
+    button {
+      padding: 11px 22px;
+      background: #4f7cf7;
+      color: white;
+      border: none;
+      border-radius: 9px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #3d6cec; }
+    .note {
+      margin-top: 20px;
+      padding: 12px 14px;
+      background: #fffbe6;
+      border: 1px solid #f0d060;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #664d00;
+    }
+    code {
+      background: #e8eaf8;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Icon Generator</h1>
+<p>
+  This utility generates the three placeholder PNG icons required by the
+  Currency Converter extension. Click the button below — three files will
+  download automatically. Move them into the <code>icons/</code> folder.
+</p>
+
+<div class="previews" id="previews"></div>
+
+<button onclick="generateAndDownload()">Generate &amp; Download Icons</button>
+
+<div class="note">
+  <strong>Instructions:</strong><br>
+  1. Click the button above.<br>
+  2. Move <code>icon16.png</code>, <code>icon48.png</code>, and <code>icon128.png</code>
+     from your Downloads folder into the <code>icons/</code> sub-folder of the extension.<br>
+  3. You can then delete this file — it is not part of the extension itself.
+</div>
+
+<script>
+/**
+ * Draws a rounded-rectangle icon with a gradient background and a
+ * currency symbol in white, then returns a PNG data URL.
+ *
+ * @param {number} size  The icon size in pixels (width = height).
+ * @returns {string}     PNG data URL.
+ */
+function drawIcon(size) {
+  const canvas = document.createElement("canvas");
+  canvas.width  = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+
+  // ── Background: blue-purple diagonal gradient ──────────────────────────
+  const grad = ctx.createLinearGradient(0, 0, size, size);
+  grad.addColorStop(0, "#3b5bdb");
+  grad.addColorStop(1, "#7048e8");
+  ctx.fillStyle = grad;
+
+  // Rounded rectangle (corner radius = 20% of size)
+  const r = Math.round(size * 0.20);
+  ctx.beginPath();
+  ctx.moveTo(r, 0);
+  ctx.lineTo(size - r, 0);
+  ctx.quadraticCurveTo(size, 0, size, r);
+  ctx.lineTo(size, size - r);
+  ctx.quadraticCurveTo(size, size, size - r, size);
+  ctx.lineTo(r, size);
+  ctx.quadraticCurveTo(0, size, 0, size - r);
+  ctx.lineTo(0, r);
+  ctx.quadraticCurveTo(0, 0, r, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // ── Subtle inner highlight (top edge) ──────────────────────────────────
+  const highlight = ctx.createLinearGradient(0, 0, 0, size * 0.5);
+  highlight.addColorStop(0, "rgba(255,255,255,0.18)");
+  highlight.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = highlight;
+  ctx.fill();
+
+  // ── Currency symbol "€$" or just "$" depending on size ─────────────────
+  ctx.fillStyle    = "#ffffff";
+  ctx.font         = `bold ${Math.round(size * 0.52)}px Arial, sans-serif`;
+  ctx.textAlign    = "center";
+  ctx.textBaseline = "middle";
+
+  // Add a subtle text shadow / depth for larger icons
+  if (size >= 48) {
+    ctx.shadowColor   = "rgba(0,0,0,0.30)";
+    ctx.shadowOffsetY = Math.round(size * 0.04);
+    ctx.shadowBlur    = Math.round(size * 0.06);
+  }
+
+  ctx.fillText("$", size / 2, size / 2 + size * 0.03);
+
+  return canvas.toDataURL("image/png");
+}
+
+/**
+ * Triggers a PNG download in the browser.
+ *
+ * @param {string} dataUrl
+ * @param {string} filename
+ */
+function downloadPng(dataUrl, filename) {
+  const link    = document.createElement("a");
+  link.download = filename;
+  link.href     = dataUrl;
+  link.click();
+}
+
+/**
+ * Renders preview canvases and starts the three downloads.
+ */
+function generateAndDownload() {
+  const sizes    = [16, 48, 128];
+  const previews = document.getElementById("previews");
+  previews.innerHTML = ""; // clear previous previews
+
+  sizes.forEach((size) => {
+    const dataUrl = drawIcon(size);
+
+    // Show preview
+    const wrapper = document.createElement("div");
+    wrapper.className = "preview";
+
+    const canvas  = document.createElement("canvas");
+    canvas.width  = size;
+    canvas.height = size;
+    canvas.style.imageRendering = "pixelated";
+
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0);
+    img.src    = dataUrl;
+
+    const label   = document.createElement("span");
+    label.textContent = `${size}×${size}`;
+
+    wrapper.appendChild(canvas);
+    wrapper.appendChild(label);
+    previews.appendChild(wrapper);
+
+    // Stagger downloads slightly to avoid browser blocking
+    setTimeout(() => downloadPng(dataUrl, `icon${size}.png`), size);
+  });
+}
+
+// Auto-render previews (without downloading) on page load
+window.addEventListener("DOMContentLoaded", () => {
+  const sizes    = [16, 48, 128];
+  const previews = document.getElementById("previews");
+
+  sizes.forEach((size) => {
+    const dataUrl = drawIcon(size);
+    const wrapper = document.createElement("div");
+    wrapper.className = "preview";
+
+    const canvas  = document.createElement("canvas");
+    canvas.width  = size;
+    canvas.height = size;
+    canvas.style.imageRendering = "pixelated";
+
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0);
+    img.src    = dataUrl;
+
+    const label   = document.createElement("span");
+    label.textContent = `${size}×${size}`;
+
+    wrapper.appendChild(canvas);
+    wrapper.appendChild(label);
+    previews.appendChild(wrapper);
+  });
+});
+</script>
+
+</body>
+</html>
