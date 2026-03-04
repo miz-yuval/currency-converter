@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,6 +10,7 @@
 
     body {
       width: 340px;
+      direction: ltr;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       font-size: 14px;
       color: #1a1a2e;
@@ -40,6 +41,8 @@
     .section-hint { font-size: 10px; color: #c4c4d8; font-style: italic; }
 
     /* ── Toggle ───────────────────────────────────────────────────────────── */
+    .section > .section-label { display: block; margin-bottom: 6px; }
+    .toggle-row + .toggle-row { margin-top: 7px; }
     .toggle-row {
       display: flex; align-items: center; justify-content: space-between;
       background: #fff; border: 1.5px solid #e2e4f0;
@@ -236,31 +239,14 @@
       text-align: right; margin-top: 4px; min-height: 14px;
     }
 
-    /* ── Footer ───────────────────────────────────────────────────────────── */
-    .footer {
-      margin-top: 12px; padding-top: 12px;
-      border-top: 1px solid #e2e4f0;
-    }
-    .save-btn {
-      display: block; width: 100%; padding: 10px;
-      background: #4f7cf7; color: #fff;
-      border: none; border-radius: 9px;
-      font-size: 14px; font-weight: 700; font-family: inherit;
-      cursor: pointer;
-      transition: background 150ms, transform 100ms;
-    }
-    .save-btn:hover  { background: #3d6cec; }
-    .save-btn:active { background: #2d5cdc; transform: scale(0.98); }
-    .save-btn:disabled { background: #b0b8e8; cursor: not-allowed; }
-
+    /* ── Error status (settings auto-save) ───────────────────────────────── */
     .status {
-      text-align: center; font-size: 12px; font-weight: 500;
-      margin-top: 8px; min-height: 16px;
+      text-align: center; font-size: 11px; font-weight: 500;
+      margin-top: 6px; min-height: 14px;
       opacity: 1; transition: opacity 400ms;
     }
-    .status--hidden  { opacity: 0; }
-    .status--success { color: #3dbc6d; }
-    .status--error   { color: #e05252; }
+    .status--hidden { opacity: 0; }
+    .status--error  { color: #e05252; }
   </style>
 </head>
 <body>
@@ -274,7 +260,7 @@
     </div>
   </div>
 
-  <!-- ── Auto-detect toggle ─────────────────────────────────────────────── -->
+  <!-- ── Detection mode toggles ────────────────────────────────────────── -->
   <div class="section">
     <span class="section-label">Detection mode</span>
     <div class="toggle-row">
@@ -284,6 +270,18 @@
       </div>
       <label class="toggle">
         <input type="checkbox" id="autoDetect" checked>
+        <span class="toggle__track">
+          <span class="toggle__thumb"></span>
+        </span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-row__text">
+        <span class="toggle-row__title">Convert bare numbers</span>
+        <span class="toggle-row__desc">Convert all highlighted numbers</span>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="convertAnyNumber" checked>
         <span class="toggle__track">
           <span class="toggle__thumb"></span>
         </span>
@@ -299,15 +297,9 @@
     Clicking the badge/name of a row also sets it as the default.
   -->
   <div class="section">
-    <div class="section-header">
-      <span class="section-label">My currencies</span>
-      <span class="section-hint">click a row to set as fallback</span>
-    </div>
+    <span class="section-label">My currencies</span>
 
     <div id="currencyList" class="currency-list"></div>
-
-    <!-- Fallback note -->
-    <p class="fallback-note">* Outlined currency is used as the source when no symbol can be detected on the page.</p>
 
     <!-- Add button -->
     <button class="add-btn" id="addBtn">＋ Add currency</button>
@@ -319,15 +311,14 @@
       <ul class="add-results" id="addResults"></ul>
     </div>
 
+    <!-- Fallback note -->
+    <p class="fallback-note">* Outlined currency is used as the source when no symbol can be detected on the page.</p>
+
     <!-- Exchange rates freshness indicator -->
     <div class="rates-status" id="ratesStatus"></div>
   </div>
 
-  <!-- ── Footer: Save ───────────────────────────────────────────────────── -->
-  <div class="footer">
-    <button class="save-btn" id="saveBtn">Save</button>
-    <p class="status status--hidden" id="status" aria-live="polite"></p>
-  </div>
+  <p class="status status--hidden" id="status" aria-live="polite"></p>
 
   <script src="popup.js"></script>
 </body>

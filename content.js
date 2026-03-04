@@ -32,6 +32,7 @@
   /** @type {{autoDetect:boolean, defaultCurrency:string, targetCurrencies:string[]}} */
   let settings = {
     autoDetect:        true,
+    convertAnyNumber:  true,
     defaultCurrency:   "USD",
     targetCurrencies:  ["EUR", "ILS", "GBP", "JPY"]
   };
@@ -40,13 +41,13 @@
 
   // Load user settings on script startup
   chrome.storage.sync.get("settings", (result) => {
-    if (result.settings) settings = result.settings;
+    if (result.settings) settings = { ...settings, ...result.settings };
   });
 
   // Keep settings in sync if the user changes them while this tab is open
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "sync" && changes.settings) {
-      settings = changes.settings.newValue;
+      settings = { ...settings, ...changes.settings.newValue };
     }
   });
 
@@ -115,18 +116,28 @@
     let sourceCurrency = null;
 
     if (settings.autoDetect) {
-      // Phase 1: scan ±50 chars of plain text surrounding the selection
       const anchorNode = selection.anchorNode;
-      const context    = getExpandedContext(anchorNode, rawText, 50);
-      sourceCurrency   = detectCurrencyInText(context);
 
-      // Phase 2: walk up the DOM tree looking for currency hints
-      if (!sourceCurrency) {
-        sourceCurrency = detectCurrencyFromDOM(anchorNode);
+      if (settings.convertAnyNumber) {
+        // Toggle ON — broad search: ±50 chars, then full DOM walk as fallback.
+        const context = getExpandedContext(anchorNode, rawText, 50);
+        sourceCurrency = detectCurrencyInText(context);
+        if (!sourceCurrency) {
+          sourceCurrency = detectCurrencyFromDOM(anchorNode);
+        }
+      } else {
+        // Toggle OFF — tight search only: symbol must be directly adjacent
+        // (±5 chars). Reliably tells "$100" apart from a bare "100" on the
+        // same page as a "$" sign somewhere in a headline or sidebar.
+        const context = getExpandedContext(anchorNode, rawText, 5);
+        sourceCurrency = detectCurrencyInText(context);
       }
     }
 
-    // Phase 3: fall back to the user's configured default
+    // Toggle OFF with no adjacent symbol found → skip entirely
+    if (!sourceCurrency && !settings.convertAnyNumber) return;
+
+    // Fall back to the user's configured default currency
     if (!sourceCurrency) sourceCurrency = settings.defaultCurrency;
 
     // ── Step 2: Ensure we have target currencies ─────────────────────────────
@@ -430,6 +441,43 @@
   // ── Tooltip rendering ───────────────────────────────────────────────────────
 
   /**
+   * Builds a single conversion list row.
+   * The converted amount is clickable — clicking it copies just the number
+   * (without the currency symbol) to the clipboard.
+   *
+   * @param {string} currency  ISO 4217 code
+   * @param {string} formatted Formatted amount string returned by formatCurrency()
+   * @returns {HTMLLIElement}
+   */
+  function buildRow(currency, formatted) {
+    const li     = document.createElement("li");
+    li.className = "cc-tooltip__row";
+
+    const codeEl = document.createElement("span");
+    codeEl.className   = "cc-tooltip__currency-code";
+    codeEl.textContent = currency;
+
+    const amtEl = document.createElement("span");
+    amtEl.className   = "cc-tooltip__amount";
+    amtEl.textContent = formatted;
+    amtEl.title       = "Click to copy";
+
+    amtEl.addEventListener("click", (e) => {
+      e.stopPropagation();
+      // Strip trailing symbol characters — keep only digits, commas, dots
+      const numOnly = amtEl.textContent.replace(/[^\d.,]+$/, "").trim();
+      const saved   = amtEl.textContent;
+      navigator.clipboard.writeText(numOnly).then(() => {
+        amtEl.textContent = "Copied!";
+        setTimeout(() => { amtEl.textContent = saved; }, 900);
+      }).catch(() => {});
+    });
+
+    li.append(codeEl, amtEl);
+    return li;
+  }
+
+  /**
    * Builds and displays the conversion tooltip.
    * The source-currency badge is clickable — clicking it opens a small
    * currency picker so the user can correct a mis-detection on the fly.
@@ -442,6 +490,11 @@
     tooltipEl.setAttribute("role",       "dialog");
     tooltipEl.setAttribute("aria-label", "Currency conversion results");
     tooltipEl.setAttribute("aria-live",  "polite");
+
+    // Prevent internal clicks from bubbling to the document-level dismiss handler.
+    // Without this, ANY click inside the tooltip (badge, amounts, close btn) would
+    // reach the document mousedown handler which calls dismissTooltip().
+    tooltipEl.addEventListener("mousedown", (e) => e.stopPropagation());
 
     // ── Header ────────────────────────────────────────────────────────────────
     const header = document.createElement("div");
@@ -472,7 +525,8 @@
       const picker = document.createElement("div");
       picker.className = "cc-tooltip__currency-picker";
 
-      Object.keys(SYM).forEach((code) => {
+      // Helper — creates one picker item and wires its click handler
+      const makePickerItem = (code) => {
         const item = document.createElement("div");
         item.className   = "cc-tooltip__picker-item"
           + (code === data.sourceCurrency ? " cc-tooltip__picker-item--active" : "");
@@ -508,23 +562,29 @@
           // Rebuild conversion rows
           list.innerHTML = "";
           for (const { currency, formatted } of newConversions) {
-            const li      = document.createElement("li");
-            li.className  = "cc-tooltip__row";
-            const codeEl  = document.createElement("span");
-            codeEl.className   = "cc-tooltip__currency-code";
-            codeEl.textContent = currency;
-            const amtEl   = document.createElement("span");
-            amtEl.className    = "cc-tooltip__amount";
-            amtEl.textContent  = formatted;
-            li.append(codeEl, amtEl);
-            list.appendChild(li);
+            list.appendChild(buildRow(currency, formatted));
           }
 
           picker.remove();
         });
 
-        picker.appendChild(item);
-      });
+        return item;
+      };
+
+      // User's saved currencies go first (most likely picks), then a rule,
+      // then everything else in SYM order.
+      const userCodes  = (settings.targetCurrencies || []).filter(c => SYM[c]);
+      const otherCodes = Object.keys(SYM).filter(c => !userCodes.includes(c));
+
+      userCodes.forEach(c => picker.appendChild(makePickerItem(c)));
+
+      if (userCodes.length > 0 && otherCodes.length > 0) {
+        const sep = document.createElement("div");
+        sep.className = "cc-tooltip__picker-sep";
+        picker.appendChild(sep);
+      }
+
+      otherCodes.forEach(c => picker.appendChild(makePickerItem(c)));
 
       badgeWrapper.appendChild(picker);
     });
@@ -544,24 +604,13 @@
     list.className = "cc-tooltip__list";
 
     for (const { currency, formatted } of data.conversions) {
-      const li      = document.createElement("li");
-      li.className  = "cc-tooltip__row";
-      const codeEl  = document.createElement("span");
-      codeEl.className   = "cc-tooltip__currency-code";
-      codeEl.textContent = currency;
-      const amtEl   = document.createElement("span");
-      amtEl.className    = "cc-tooltip__amount";
-      amtEl.textContent  = formatted;
-      li.append(codeEl, amtEl);
-      list.appendChild(li);
+      list.appendChild(buildRow(currency, formatted));
     }
 
     // ── Footer: timestamp ─────────────────────────────────────────────────────
     const footer = document.createElement("div");
     footer.className = "cc-tooltip__footer";
-    const timeStr = new Date(data.timestamp).toLocaleTimeString(undefined, {
-      hour: "2-digit", minute: "2-digit"
-    });
+    const timeStr = new Date(data.timestamp).toLocaleTimeString(undefined, { timeStyle: "short" });
     footer.textContent = `Rates updated ${timeStr}${data.fromCache ? "" : " (just now)"}`;
 
     tooltipEl.append(header, list, footer);

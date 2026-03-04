@@ -74,20 +74,21 @@ let currencies = ["USD", "EUR", "ILS", "GBP"];
 let defaultCurrency = "USD";
 
 let autoDetect = true;
+let convertAnyNumber = true;
 
 /** Exchange rates from the service worker (keyed to USD). null until loaded. */
 let rates = null;
 
 // ── DOM references ────────────────────────────────────────────────────────────
 
-const autoDetectEl   = document.getElementById("autoDetect");
+const autoDetectEl       = document.getElementById("autoDetect");
+const convertAnyNumberEl = document.getElementById("convertAnyNumber");
 const currencyListEl = document.getElementById("currencyList");
 const addBtnEl       = document.getElementById("addBtn");
 const addDropdownEl  = document.getElementById("addDropdown");
 const addSearchEl    = document.getElementById("addSearch");
 const addResultsEl   = document.getElementById("addResults");
 const ratesStatusEl  = document.getElementById("ratesStatus");
-const saveBtnEl      = document.getElementById("saveBtn");
 const statusEl       = document.getElementById("status");
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
@@ -102,7 +103,8 @@ function loadSettings() {
   chrome.storage.sync.get("settings", (result) => {
     if (!chrome.runtime.lastError && result.settings) {
       const s = result.settings;
-      autoDetect = s.autoDetect ?? true;
+      autoDetect       = s.autoDetect       ?? true;
+      convertAnyNumber = s.convertAnyNumber ?? true;
 
       if (Array.isArray(s.targetCurrencies) && s.targetCurrencies.length) {
         currencies = [...s.targetCurrencies];
@@ -114,36 +116,32 @@ function loadSettings() {
           : currencies[0];
     }
 
-    autoDetectEl.checked = autoDetect;
+    autoDetectEl.checked       = autoDetect;
+    convertAnyNumberEl.checked = convertAnyNumber;
     renderCurrencyList();
   });
 }
 
-function saveSettings() {
-  if (currencies.length === 0) {
-    showStatus("Add at least one currency first.", "error");
-    return;
-  }
+let _saveTimer = null;
 
+function _doSave() {
+  if (currencies.length === 0) return;
   const settings = {
     autoDetect:       autoDetectEl.checked,
+    convertAnyNumber: convertAnyNumberEl.checked,
     defaultCurrency:  defaultCurrency,
     targetCurrencies: currencies,
   };
-
-  saveBtnEl.disabled    = true;
-  saveBtnEl.textContent = "Saving…";
-
   chrome.storage.sync.set({ settings }, () => {
-    saveBtnEl.disabled    = false;
-    saveBtnEl.textContent = "Save";
-
     if (chrome.runtime.lastError) {
-      showStatus("Error: " + chrome.runtime.lastError.message, "error");
-    } else {
-      showStatus("Saved!", "success");
+      showStatus("Could not save: " + chrome.runtime.lastError.message, "error");
     }
   });
+}
+
+function saveSettings() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(_doSave, 400);
 }
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
@@ -245,6 +243,8 @@ function setDefault(code) {
     const match = item.dataset.code === code;
     item.classList.toggle("is-default", match);
   });
+
+  saveSettings();
 }
 
 // ── Currency list mutations ───────────────────────────────────────────────────
@@ -254,8 +254,8 @@ function addCurrency(code) {
   currencies.push(code);
   closeAddDropdown();
   renderCurrencyList();
-  // If this was the first currency added, make it the default
   if (currencies.length === 1) defaultCurrency = code;
+  saveSettings();
 }
 
 function removeCurrency(code) {
@@ -264,6 +264,7 @@ function removeCurrency(code) {
     defaultCurrency = currencies[0] || "";
   }
   renderCurrencyList();
+  saveSettings();
 }
 
 // ── Conversion ────────────────────────────────────────────────────────────────
@@ -349,10 +350,8 @@ function fetchRates() {
 
     rates = response.data.rates;
 
-    const t = new Date(response.data.timestamp).toLocaleTimeString(undefined, {
-      hour: "2-digit", minute: "2-digit",
-    });
-    ratesStatusEl.textContent = `Rates updated ${t}`;
+    const t = new Date(response.data.timestamp).toLocaleTimeString(undefined, { timeStyle: "short" });
+    ratesStatusEl.textContent = `Rates as of ${t}`;
 
     // If the default input already has a value typed, convert it now
     const defaultInput = currencyListEl.querySelector(
@@ -423,7 +422,8 @@ function renderAddResults(query) {
 // ── Global event listeners ────────────────────────────────────────────────────
 
 function attachListeners() {
-  saveBtnEl.addEventListener("click", saveSettings);
+  autoDetectEl.addEventListener("change", () => { clearTimeout(_saveTimer); _doSave(); });
+  convertAnyNumberEl.addEventListener("change", () => { clearTimeout(_saveTimer); _doSave(); });
 
   addBtnEl.addEventListener("click", () => {
     addDropdownEl.hidden ? openAddDropdown() : closeAddDropdown();
